@@ -7,14 +7,9 @@ from constrant_decoding import function_deffinition
 
 input_file = 'data/input/function_calling_tests.json'
 function_defenation = "/home/p1rox/Documents/Call-me-maybe/data/input/functions_definition.json"
-var = read_promts(input_file)
 function = read_functions(function_defenation)
 
-print(var[1].prompt)
-index = 0
-my_list = []
-
-prompt = "Generate a greeting message for a human by flan"
+prompt = "greet yassin"
 
 constrant = function_deffinition(function, prompt)
 var = constrant.elemenate_token()

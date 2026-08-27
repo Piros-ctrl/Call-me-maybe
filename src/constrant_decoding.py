@@ -57,32 +57,18 @@ class function_deffinition:
                 )
 
     def elemenate_token(self):
+        valid_function_names = [function.name for function in self.functions]
         function_name = ""
         allowed = self._allowed_tokens()
-        encoded_promt = self.qwen.encode(self.given_prompt()).tolist()[0]
-        
-        # Make a quick list of just the text names so we can exit the loop later
-        valid_function_names = [f.name for f in self.functions]
-        
-        while True:
-            # 1. Ask for predictions INSIDE the loop so they update every step
+        encoded_promt = self.qwen.encode((self.given_prompt())).tolist()[0]
+        while 1:
             logits = self.qwen.get_logits_from_input_ids(encoded_promt)
-            
-            # 2. Apply the mask
             for i in range(len(logits)):
-                # FIX: Check if the index 'i' is allowed, not the score 'logits[i]'
                 if i not in allowed:
                     logits[i] = float("-inf")
-            
-            # 3. Find the winner and append it
             final_token = logits.index(max(logits))
             encoded_promt.append(final_token)
-            
-            # 4. FIX: Add brackets to the decode function
             function_name += self.qwen.decode([final_token])
-            
-            # 5. FIX: Check against the list of names, not objects
             if function_name in valid_function_names:
                 break
-                
         return function_name
