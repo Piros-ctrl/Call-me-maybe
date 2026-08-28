@@ -1,6 +1,6 @@
 import sys
 from parsing import func_demonstration, prompts
-from functions import read_functions, read_promts
+from conver_to_list import read_functions, read_promts
 import json
 from constrant_decoding import function_deffinition
 
@@ -9,10 +9,10 @@ input_file = 'data/input/function_calling_tests.json'
 function_defenation = "/home/p1rox/Documents/Call-me-maybe/data/input/functions_definition.json"
 function = read_functions(function_defenation)
 
-prompt = "greet yassin"
+prompt = "Calculate the square root of 144"
 
 constrant = function_deffinition(function, prompt)
-var = constrant.elemenate_token()
+var = constrant.result()
 # var = constrant.call_next()
 print(var)
 
