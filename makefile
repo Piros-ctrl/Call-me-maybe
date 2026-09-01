@@ -1,7 +1,7 @@
 install:
 	do something
 run:
-	also do something
+	uv run --with torch --with transformers --with accelerate python -m src.main
 debuge:
 	again do something here
 clean:

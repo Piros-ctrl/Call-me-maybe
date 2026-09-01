@@ -1,11 +1,14 @@
 from llm_sdk.llm_sdk import Small_LLM_Model
+import json
 
 class function_deffinition:
     def __init__(self, functions, prompt):
+        self.functions_obj = functions
         self.functions = [function.name for function in functions]
         self.prompt = prompt
         self.qwen = Small_LLM_Model()
         self.index = 0
+        self.function_name = self.elemenate_token()
 
     def _incress_index(self):
         self.index += 1
@@ -49,6 +52,7 @@ class function_deffinition:
                 )
 
     def elemenate_token(self):
+        self.index = 0
         function_name = ""
         encoded_promt = self.qwen.encode((self.given_prompt())).tolist()[0]
         while 1:
@@ -62,41 +66,104 @@ class function_deffinition:
             function_name += self.qwen.decode([final_token])
             if function_name in self.functions:
                 break
+        self.function_name = function_name
         return function_name
 
-    def prompt_json(self):
-        # We leave the final bracket off so the LLM knows it needs to finish the JSON
+    def get_function_obj(self):
+        function_name = self.function_name
+        for function in  self.functions_obj:
+            if function.name == function_name:
+                return function
+        return False
+
+    def get_function_params(self):
+        parameters = self.get_function_obj().parameters
+        return parameters
+
+    def extract_params(self):
+        param_dict = {}
+        raw_params = self.get_function_params()
+        for key, value in raw_params.items():
+            param_dict[key] = value.type
+        return param_dict
+
+    def _allowed_parameter_tokens(self):
+        encoded_params = self.qwen.encode(self.prompt).tolist()[0]
+        return encoded_params
+
+    def parameter_prompt(self):
         return (
-            "Create a JSON object exactly like this.\n"
-            "Example:\n"
-            "{\n"
-            '   "prompt": "What is the sum of 2 and 3",\n'
-            '   "name": "fn_add_numbers"\n'
-            "}\n"
-            "Now complete this one:\n"
-            "{\n"
-            f'   "prompt": "{self.prompt}",\n'
-            f'   "name": "{self.elemenate_token()}"\n'
+                "You are a smart parameter extraction engine.\n"
+                "You are given a function name and a user request.\n"
+                "Infer the parameters from the request.\n\n"
+
+                f"Function: {self.function_name}\n"
+                f"parameters: {self.extract_params()}\n\n"
+                "Rules:\n"
+                "- Return ONLY valid JSON.\n"
+                "- Format:\n"
+                '{ "name": "<function>", "parameters": { ... } }\n'
+                "- Do NOT add explanation.\n"
+                "- Infer parameter names logically.\n"
+                "- Use meaningful parameter names based on the function name.\n\n"
+                "- All numeric values MUST be returned as floats, even "
+                "if they are whole numbers (e.g., 2 -> 2.0). Never return integers."
+
+                "Examples:\n"
+                "Function: fn_add_numbers\n"
+                "User: what is the sum of 2 and 4\n"
+                'Assistant: { "name": "fn_add_numbers", '
+                '"parameters": {"a": 2.0, "b": 4.0} }\n\n'
+
+                "Function: fn_get_square_root\n"
+                "User: Calculate the square root of 144\n"
+                'Assistant: { "name": "fn_get_square_root",'
+                ' "parameters": {"a": 144.0} }\n\n'
+
+
+                "Function: fn_greet\n"
+                "User: Greet shrek\n"
+                'Assistant: { "name": "fn_greet", "parameters": {"name": shrek} }\n\n'
+
+                "Function: fn_reverse_string\n"
+                "User: reverse hello\n"
+                'Assistant: {"prompt": "Reverse the string hello",'
+                ' "name": "fn_reverse_string", "parameters": {"s": "hello"} }\n\n'
+
+                f"Function: {self.function_name}\n"
+                F"User: {self.prompt}\n"
+                "Assistant: {"
         )
 
-    def result(self):
-        tokens = []
-        # Encode the prompt into a flat list of IDs
-        encoded_res = self.qwen.encode(self.prompt_json()).tolist()[0]
-        
-        for n in range(54):
-            # 1. Ask the model for the next token scores
-            logits = self.qwen.get_logits_from_input_ids(encoded_res)
+    def raw_data(self):
+        encoded = self.qwen.encode(self.parameter_prompt()).tolist()[0]
+        o_bracket = self.qwen.encode("{").tolist()[0]
+        c_bracket = self.qwen.encode("}").tolist()[0]
+        generated_tokens = o_bracket
+
+        while True:
+            logits = self.qwen.get_logits_from_input_ids(encoded)
+
+            token = logits.index(max(logits))
+
+            encoded.append(token)
+            generated_tokens.append(token)
+
+            text = self.qwen.decode(generated_tokens)
+
+            if text.endswith("}"):
+                generated_tokens += c_bracket
+                break
+        return self.qwen.decode(generated_tokens)
+
+    def creat_single_request(self):
+        parsed_data = json.loads(self.raw_data())
+
+        request_dict = {
+            "prompt": self.prompt,
+            "name": self.function_name,
+            "parameters": parsed_data["parameters"]
+        }
+
+        return request_dict
             
-            # 2. Find the winning token ID
-            winer_token = logits.index(max(logits))
-            
-            # 3. Append the winning ID to the prompt so the model sees it on the next loop
-            encoded_res.append(winer_token)
-            
-            # 4. Save the token to our results list
-            tokens.append(winer_token)
-            
-        # 5. Decode only the newly generated tokens into a text string once the loop is done
-        tk = self.qwen.decode(tokens)
-        return tk

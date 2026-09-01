@@ -3,18 +3,20 @@ from parsing import func_demonstration, prompts
 from conver_to_list import read_functions, read_promts
 import json
 from constrant_decoding import function_deffinition
+from pprint import pprint
 
 
 input_file = 'data/input/function_calling_tests.json'
 function_defenation = "/home/p1rox/Documents/Call-me-maybe/data/input/functions_definition.json"
 function = read_functions(function_defenation)
 
-prompt = "Calculate the square root of 144"
+prompt = "What is the square root of 16?"
 
 constrant = function_deffinition(function, prompt)
-var = constrant.result()
+var = constrant.creat_single_request()
 # var = constrant.call_next()
-print(var)
+pprint(var, compact=True)
+
 
 
 # def test():
