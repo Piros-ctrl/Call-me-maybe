@@ -1,12 +1,11 @@
-from llm_sdk.llm_sdk import Small_LLM_Model
 import json
 
 class function_deffinition:
-    def __init__(self, functions, prompt):
+    def __init__(self, functions, prompt, qwen):
         self.functions_obj = functions
         self.functions = [function.name for function in functions]
         self.prompt = prompt
-        self.qwen = Small_LLM_Model()
+        self.qwen = qwen
         self.index = 0
         self.function_name = self.elemenate_token()
 
@@ -93,55 +92,48 @@ class function_deffinition:
 
     def parameter_prompt(self):
         return (
-                "You are a smart parameter extraction engine.\n"
-                "You are given a function name and a user request.\n"
-                "Infer the parameters from the request.\n\n"
+            "Extract the parameters for the function from the user request.\n"
+            f"Function: {self.function_name}\n"
+            f"Parameters: {self.extract_params()}\n"
+            f"User: {self.prompt}\n\n"
+            "Return ONLY valid JSON in this format: "
+            '{"parameters": {...}}\n'
+            "Use only defined parameters."
+            "Numbers must be floats.\n\n"
+            "Make sure that the outpput is VALID JSON"
 
-                f"Function: {self.function_name}\n"
-                f"parameters: {self.extract_params()}\n\n"
-                "Rules:\n"
-                "- Return ONLY valid JSON.\n"
-                "- Format:\n"
-                '{ "name": "<function>", "parameters": { ... } }\n'
-                "- Do NOT add explanation.\n"
-                "- Infer parameter names logically.\n"
-                "- Use meaningful parameter names based on the function name.\n\n"
-                "- All numeric values MUST be returned as floats, even "
-                "if they are whole numbers (e.g., 2 -> 2.0). Never return integers."
+            "Examples:\n"
 
-                "Examples:\n"
-                "Function: fn_add_numbers\n"
-                "User: what is the sum of 2 and 4\n"
-                'Assistant: { "name": "fn_add_numbers", '
-                '"parameters": {"a": 2.0, "b": 4.0} }\n\n'
+            "Function: fn_add_numbers\n"
+            'Parameters: {"a": float, "b": float}\n'
+            "User: what is the sum of 2 and 4\n"
+            'Assistant: {"parameters": {"a": 2.0, "b": 4.0}}'
 
-                "Function: fn_get_square_root\n"
-                "User: Calculate the square root of 144\n"
-                'Assistant: { "name": "fn_get_square_root",'
-                ' "parameters": {"a": 144.0} }\n\n'
+            "\nFunction: fn_get_square_root\n"
+            'Parameters: {"a": float}\n'
+            "User: Calculate the square root of 144\n"
+            'Assistant: {"parameters": {"a": 144.0}}'
 
+            "\nFunction: fn_greet\n"
+            'Parameters: {"s": str}\n'
+            "User: Greet fred\n"
+            'Assistant: {"parameters": {"s": "fred"}}'
 
-                "Function: fn_greet\n"
-                "User: Greet shrek\n"
-                'Assistant: { "name": "fn_greet", "parameters": {"name": shrek} }\n\n'
+            "\nFunction: fn_substitute_string_with_regex\n"
+            'Parameters: {"source_string":"string","regex":"string","replacement":"string"}\n'
+            'User: Replace all numbers in "Hello 34 I\'m 233 years old" with NUMBERS\n'
+            'Assistant: {"parameters": {"source_string": "Hello 34 I\'m 233 years old", "regex": "[0-9]+", "replacement": "NUMBERS"}}'
 
-                "Function: fn_reverse_string\n"
-                "User: reverse hello\n"
-                'Assistant: {"prompt": "Reverse the string hello",'
-                ' "name": "fn_reverse_string", "parameters": {"s": "hello"} }\n\n'
-
-                f"Function: {self.function_name}\n"
-                F"User: {self.prompt}\n"
-                "Assistant: {"
+            f"\nFunction: {self.function_name}\n"
+            f"User: {self.prompt}\n"
+            'Assistant: {"parameters": '
         )
 
     def raw_data(self):
         encoded = self.qwen.encode(self.parameter_prompt()).tolist()[0]
-        o_bracket = self.qwen.encode("{").tolist()[0]
-        c_bracket = self.qwen.encode("}").tolist()[0]
-        generated_tokens = o_bracket
-
-        while True:
+        generated_tokens = []
+        i = 0
+        while i < 50:
             logits = self.qwen.get_logits_from_input_ids(encoded)
 
             token = logits.index(max(logits))
@@ -150,11 +142,14 @@ class function_deffinition:
             generated_tokens.append(token)
 
             text = self.qwen.decode(generated_tokens)
+            i+=1
 
-            if text.endswith("}"):
-                generated_tokens += c_bracket
+            if "}" in text:
                 break
-        return self.qwen.decode(generated_tokens)
+        raw_str = self.qwen.decode(generated_tokens)
+        result = raw_str.split("}")
+        net_value = result[0] + "}"
+        return net_value.strip()
 
     def creat_single_request(self):
         parsed_data = json.loads(self.raw_data())
@@ -162,7 +157,7 @@ class function_deffinition:
         request_dict = {
             "prompt": self.prompt,
             "name": self.function_name,
-            "parameters": parsed_data["parameters"]
+            "parameters": parsed_data
         }
 
         return request_dict

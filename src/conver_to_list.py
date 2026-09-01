@@ -14,8 +14,8 @@ def read_promts(file_path):
         exit(1)
     prompt_list = []
     try:
-        for prmt in file:
-            prompt = prompts(**prmt)
+        for prompt_dict in file:
+            prompt = prompts(**prompt_dict)
             prompt_list.append(prompt)
     except ValidationError:
         for error in e.errors():
@@ -40,14 +40,3 @@ def read_functions(file_path):
         for error in e.errors():
             print(error["msg"])
     return function_list
-
-def promt_conter(file_path):
-    try:
-        with open(file_path, "r") as f:
-            data = json.load(f)
-        if not isinstance(data, list):
-            raise ValueError("recheck you file data in this path :",file_path)
-    except (FileNotFoundError, ValueError) as e:
-        print(e)
-        exit(1)
-    return len(data)
