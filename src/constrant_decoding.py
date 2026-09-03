@@ -1,6 +1,6 @@
 import json
 
-class function_deffinition:
+class function_deff:
     def __init__(self, functions, prompt, qwen):
         self.functions_obj = functions
         self.functions = [function.name for function in functions]
@@ -99,6 +99,7 @@ class function_deffinition:
             "Return ONLY valid JSON in this format: "
             '{"parameters": {...}}\n'
             "Use only defined parameters."
+            "Return ONLY valid JSON.\n"
             "Numbers must be floats.\n\n"
             "Make sure that the outpput is VALID JSON"
 
@@ -114,15 +115,25 @@ class function_deffinition:
             "User: Calculate the square root of 144\n"
             'Assistant: {"parameters": {"a": 144.0}}'
 
+            "\nFunction: fn_substitute_string_with_regex\n"
+            'Parameters: {"source_string":"string","regex":"string","replacement":"string"}\n'
+            "User: Replace all vowels in 'Programming is fun' with asterisks\n"
+            'Assistant: {"parameters": {"source_string": "Programming is fun", "regex": "[aeiouAEIOU]", "replacement": "*"}}'
+
             "\nFunction: fn_greet\n"
-            'Parameters: {"s": str}\n'
+            'Parameters: {"name": str}\n'
             "User: Greet fred\n"
             'Assistant: {"parameters": {"s": "fred"}}'
 
             "\nFunction: fn_substitute_string_with_regex\n"
             'Parameters: {"source_string":"string","regex":"string","replacement":"string"}\n'
-            'User: Replace all numbers in "Hello 34 I\'m 233 years old" with NUMBERS\n'
-            'Assistant: {"parameters": {"source_string": "Hello 34 I\'m 233 years old", "regex": "[0-9]+", "replacement": "NUMBERS"}}'
+            'User: Replace all numbers in "I have 12 apples and 5 oranges" with NUM\n'
+            'Assistant: {"parameters": {"source_string": "I have 12 apples and 5 oranges", "regex": "\\\\d+", "replacement": "NUM"}}'
+
+            "\nFunction: fn_format_template\n"
+            'Parameters: {"template": "string"}\n'
+            'User: Format template: Say "hello" to {name}\n'
+            'Assistant: {"parameters": {"template": "Say \\"hello\\" to {name}"}}'
 
             f"\nFunction: {self.function_name}\n"
             f"User: {self.prompt}\n"
@@ -144,15 +155,23 @@ class function_deffinition:
             text = self.qwen.decode(generated_tokens)
             i+=1
 
-            if "}" in text:
+            if "}}" in text:
                 break
-        raw_str = self.qwen.decode(generated_tokens)
-        result = raw_str.split("}")
-        net_value = result[0] + "}"
-        return net_value.strip()
-
+        net_value = self.qwen.decode(generated_tokens)
+        net_value = net_value.strip()
+        if net_value.endswith("}}"):
+            return net_value[:-1]
+        return net_value
     def creat_single_request(self):
         parsed_data = json.loads(self.raw_data())
+
+        func_obj = self.get_function_obj()
+        parameret_dict = func_obj.parameters
+        for key, val in parameret_dict.items():
+            if val.type == "number":
+                parsed_data[key] = float(parsed_data[key])
+            if val.type == "integer":
+                parsed_data[key] = int(parsed_data[key])
 
         request_dict = {
             "prompt": self.prompt,

@@ -46,7 +46,7 @@ class Small_LLM_Model:
                 device = "cuda"
             else:
                 device = "cpu"
-        self._device = "cuda"
+        self._device = "cpu"
 
         if dtype is None:
             dtype = torch.float16 if self._device in ["cuda", "mps"] else torch.float32
