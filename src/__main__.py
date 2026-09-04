@@ -1,11 +1,13 @@
 import json
+import os
 from llm_sdk.llm_sdk import Small_LLM_Model
 from argparse import ArgumentParser
 from conver_to_list import read_functions, read_promts
 from constrant_decoding import function_deff
 
 
-def main():
+def main() -> None:
+    """Run function-calling tests against the LLM and write results to a JSON output file."""
     qwen = Small_LLM_Model()
     output_fil = []
     input_file = 'data/input/function_calling_tests.json'
@@ -24,21 +26,9 @@ def main():
         constrant = function_deff(function, prompt_obj.prompt, qwen)
         request_respond = constrant.creat_single_request()
         output_fil.append(request_respond)
-    with open("data/input/function_calling_results.json", "w") as output:
+    os.mkdir("data/output")
+    with open(args.output, "w") as output:
         json.dump(output_fil, output, indent=4)
 
+
 main()
-
-
-
-
-
-
-
-# prompt_o = "What is the product of 3 and 5?"
-# qwen = Small_LLM_Model()
-# function_defenation = "/home/p1rox/Documents/Call-me-maybe/data/input/functions_definition.json"
-# function = read_functions(function_defenation)
-# constrant = function_deffinition(function, prompt_o, qwen)
-# request_respond = constrant.creat_single_request()
-# print(request_respond)

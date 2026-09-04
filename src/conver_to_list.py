@@ -3,12 +3,13 @@ import json
 from parsing import func_demonstration, prompts
 
 
-def read_promts(file_path):
+def read_promts(file_path: str) -> list[prompts]:
+    """Read a JSON file of prompt dicts and parse them into a list of `prompts` objects."""
     try:
         with open(file_path, "r") as f:
             file = json.load(f)
-            if not isinstance(file, list):
-                raise ValueError("recheck you file data in this path :",file_path)
+        if not isinstance(file, list):
+            raise ValueError("recheck you file data in this path :",file_path)
     except (FileNotFoundError, ValueError) as e:
         print(e)
         exit(1)
@@ -22,12 +23,13 @@ def read_promts(file_path):
             print(error["msg"])
     return prompt_list
 
-def read_functions(file_path):
+def read_functions(file_path: str) -> list[func_demonstration]:
+    """Read a JSON file of function-definition dicts and parse them into a list of `func_demonstration` objects."""
     try:
         with open(file_path, "r") as f:
             file = json.load(f)
-            if not isinstance(file, list):
-                raise ValueError("recheck you file data in this path :",file_path)
+        if not isinstance(file, list):
+            raise ValueError("recheck you file data in this path :",file_path)
     except (FileNotFoundError, ValueError) as e:
         print(e)
         exit(1)

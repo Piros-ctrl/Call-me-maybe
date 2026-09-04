@@ -1,7 +1,12 @@
+from typing import Any
 import json
 
+
 class function_deff:
-    def __init__(self, functions, prompt, qwen):
+    """Selects the best matching function for a prompt via constrained decoding, then extracts and types its parameters."""
+
+    def __init__(self, functions: list[Any], prompt: str, qwen: Any) -> None:
+        """Store the available functions, prompt, and LLM instance, then immediately decode the matching function name."""
         self.functions_obj = functions
         self.functions = [function.name for function in functions]
         self.prompt = prompt
@@ -9,10 +14,12 @@ class function_deff:
         self.index = 0
         self.function_name = self.elemenate_token()
 
-    def _incress_index(self):
+    def _incress_index(self) -> None:
+        """Advance the token index by one."""
         self.index += 1
 
-    def function_def(self):
+    def function_def(self) -> list[list[int]]:
+        """Encode each candidate function name into token ids."""
         func_encoded = []
         for function in self.functions:
             tens_res = self.qwen.encode(function)
@@ -20,7 +27,8 @@ class function_deff:
             func_encoded.append(dec_func)
         return func_encoded
 
-    def call_next(self):
+    def call_next(self) -> list[int]:
+        """Return the set of allowed next tokens (one per function) at the current index, then advance the index."""
         encoded_func = self.function_def()
         one_token_in_func = []
         for n in encoded_func:
@@ -29,7 +37,8 @@ class function_deff:
         self._incress_index()
         return one_token_in_func
 
-    def given_prompt(self):
+    def given_prompt(self) -> str:
+        """Build the prompt asking the model to pick the best matching function name."""
         return (
                 "From the Given prompt pick the best Function.\n"
                 "Return JUST the function name. No more no less.\n"
@@ -50,7 +59,8 @@ class function_deff:
                 "Output: "
                 )
 
-    def elemenate_token(self):
+    def elemenate_token(self) -> str:
+        """Generate the function name token-by-token via constrained decoding until a valid function name is produced."""
         self.index = 0
         function_name = ""
         encoded_promt = self.qwen.encode((self.given_prompt())).tolist()[0]
@@ -68,29 +78,34 @@ class function_deff:
         self.function_name = function_name
         return function_name
 
-    def get_function_obj(self):
+    def get_function_obj(self) -> Any:
+        """Return the function definition object matching the decoded function name, or False if not found."""
         function_name = self.function_name
         for function in  self.functions_obj:
             if function.name == function_name:
                 return function
         return False
 
-    def get_function_params(self):
+    def get_function_params(self) -> dict[str, Any]:
+        """Return the parameter definitions of the selected function."""
         parameters = self.get_function_obj().parameters
         return parameters
 
-    def extract_params(self):
+    def extract_params(self) -> dict[str, str]:
+        """Return a mapping of parameter name to parameter type string for the selected function."""
         param_dict = {}
         raw_params = self.get_function_params()
         for key, value in raw_params.items():
             param_dict[key] = value.type
         return param_dict
 
-    def _allowed_parameter_tokens(self):
+    def _allowed_parameter_tokens(self) -> list[int]:
+        """Encode the original prompt into token ids."""
         encoded_params = self.qwen.encode(self.prompt).tolist()[0]
         return encoded_params
 
-    def parameter_prompt(self):
+    def parameter_prompt(self) -> str:
+        """Build the few-shot prompt asking the model to extract function parameters as JSON."""
         return (
             "Extract the parameters for the function from the user request.\n"
             f"Function: {self.function_name}\n"
@@ -123,7 +138,7 @@ class function_deff:
             "\nFunction: fn_greet\n"
             'Parameters: {"name": str}\n'
             "User: Greet fred\n"
-            'Assistant: {"parameters": {"s": "fred"}}'
+            'Assistant: {"parameters": {"name": "fred"}}'
 
             "\nFunction: fn_substitute_string_with_regex\n"
             'Parameters: {"source_string":"string","regex":"string","replacement":"string"}\n'
@@ -140,7 +155,8 @@ class function_deff:
             'Assistant: {"parameters": '
         )
 
-    def raw_data(self):
+    def raw_data(self) -> str:
+        """Generate the parameter JSON text token-by-token until closing braces appear or 50 tokens are reached."""
         encoded = self.qwen.encode(self.parameter_prompt()).tolist()[0]
         generated_tokens = []
         i = 0
@@ -162,7 +178,9 @@ class function_deff:
         if net_value.endswith("}}"):
             return net_value[:-1]
         return net_value
-    def creat_single_request(self):
+
+    def creat_single_request(self) -> dict[str, Any]:
+        """Parse the generated parameter JSON, coerce numeric types, and build the final function-call request dict."""
         parsed_data = json.loads(self.raw_data())
 
         func_obj = self.get_function_obj()
@@ -180,4 +198,3 @@ class function_deff:
         }
 
         return request_dict
-            
